@@ -1,61 +1,48 @@
-import telebot
 import time
-import threading
+import csv
+import requests
+import schedule
+import telegram
+from telegram import InputMediaPhoto
+from datetime import datetime
 import os
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")
+bot = telegram.Bot(token=TOKEN)
 
-bot = telebot.TeleBot(BOT_TOKEN)
+def read_posts():
+    with open("products.csv", encoding="utf-8") as f:
+        reader = csv.reader(f, delimiter="\t")
+        posts = []
+        for row in reader:
+            if len(row) >= 13:
+                product_id, img_url, _, title, original_price, sale_price, _, _, _, _, _, rating, link = row[:13]
+                try:
+                    response = requests.get(img_url)
+                    image_bytes = response.content
+                    discount = round((float(original_price[4:]) - float(sale_price[4:])) / float(original_price[4:]) * 100)
+                    post_text = f"פוסט חדש בערוץ!\n\n📌 {title}\n💰 מחיר מבצע: {sale_price}\n🧾 מחיר רגיל: {original_price}\n💸 חיסכון: {discount}%\n⭐ דירוג: {rating}\n\n👇🛍הזמינו עכשיו🛍👇\n{link}\n\n🆔 מספר פריט: {product_id}\nכל המחירים והמבצעים תקפים למועד הפרסום ועשויים להשתנות."
+                    posts.append((post_text, image_bytes))
+                except Exception as e:
+                    print("Error processing row:", e)
+        return posts
 
-def read_products():
-    if not os.path.exists("products.txt"):
-        return []
-    with open("products.txt", "r", encoding="utf-8") as f:
-        lines = f.readlines()
-    return [line.strip() for line in lines if line.strip()]
+def post_to_telegram():
+    global post_index
+    if post_index < len(posts):
+        text, image = posts[post_index]
+        bot.send_photo(chat_id=CHANNEL_ID, photo=image, caption=text)
+        print(f"Post sent: {datetime.now()}")
+        post_index += 1
+    else:
+        print("No more posts to send.")
 
-def post_to_channel(product_line):
-    parts = product_line.split("\t")
-    if len(parts) < 13:
-        return
-    product_id, image_url, _, description, original_price, sale_price, discount, _, _, _, _, orders, rating, purchase_link = parts
+posts = read_posts()
+post_index = 0
+schedule.every(20).minutes.do(post_to_telegram)
 
-    caption = (
-        "🔥 אל תפספסו! מוצר חדש הגיע לערוץ! 🔥\n\n"
-        f"🛍️ {description.strip()}\n"
-        f"💸 מחיר מבצע: {sale_price.strip()} (מחיר מקורי: {original_price.strip()})\n"
-        f"🎯 חיסכון של: {discount.strip()}\n"
-        f"⭐️ דירוג: {rating.strip()}%\n"
-        f"📦 הזמנות: {orders.strip()}\n\n"
-        f"👇🛍הזמינו עכשיו🛍👇\n"
-        f"{purchase_link.strip()}\n\n"
-        f"מספר פריט: {product_id.strip()}\n\n"
-        "להצטרפות לערוץ לחצו עליי👉 https://t.me/+LCv-Xuy6z9RjY2I0"
-    )
-
-    try:
-        bot.send_photo(CHANNEL_ID, photo=image_url.strip(), caption=caption)
-    except Exception as e:
-        print(f"Error sending post: {e}")
-
-def schedule_posts():
-    products = read_products()
-    for i, product in enumerate(products):
-        delay = i * 20 * 60  # every 20 minutes
-        threading.Timer(delay, post_to_channel, args=[product]).start()
-
-@bot.message_handler(content_types=['text'])
-def handle_text(message):
-    if message.chat.id != ADMIN_ID:
-        bot.send_message(message.chat.id, "⛔️ אין לך הרשאות לבצע פעולה זו.")
-        return
-    with open("products.txt", "w", encoding="utf-8") as f:
-        f.write(message.text)
-    bot.send_message(message.chat.id, "✅ הנתונים התקבלו ונשמרו. הפוסטים יתחילו להישלח 🎯")
-    schedule_posts()
-
-print("Starting bot...")
-schedule_posts()
-bot.polling()
+print("Bot started. Waiting to send posts...")
+while True:
+    schedule.run_pending()
+    time.sleep(1)
