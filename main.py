@@ -1,35 +1,61 @@
-import os
-import time
 import telebot
+import time
+import threading
+import os
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")  # דוגמה: "@YourChannelName"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_ID = os.getenv("CHANNEL_ID")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN)
 
-def get_next_post():
+def read_products():
+    if not os.path.exists("products.txt"):
+        return []
+    with open("products.txt", "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    return [line.strip() for line in lines if line.strip()]
+
+def post_to_channel(product_line):
+    parts = product_line.split("\t")
+    if len(parts) < 13:
+        return
+    product_id, image_url, _, description, original_price, sale_price, discount, _, _, _, _, orders, rating, purchase_link = parts
+
+    caption = (
+        "🔥 אל תפספסו! מוצר חדש הגיע לערוץ! 🔥\n\n"
+        f"🛍️ {description.strip()}\n"
+        f"💸 מחיר מבצע: {sale_price.strip()} (מחיר מקורי: {original_price.strip()})\n"
+        f"🎯 חיסכון של: {discount.strip()}\n"
+        f"⭐️ דירוג: {rating.strip()}%\n"
+        f"📦 הזמנות: {orders.strip()}\n\n"
+        f"👇🛍הזמינו עכשיו🛍👇\n"
+        f"{purchase_link.strip()}\n\n"
+        f"מספר פריט: {product_id.strip()}\n\n"
+        "להצטרפות לערוץ לחצו עליי👉 https://t.me/+LCv-Xuy6z9RjY2I0"
+    )
+
     try:
-        with open("posts.txt", "r", encoding="utf-8") as file:
-            posts = file.readlines()
-        if not posts:
-            return None
-        next_post = posts[0].strip()
-        # Remove the first post after sending
-        with open("posts.txt", "w", encoding="utf-8") as file:
-            file.writelines(posts[1:])
-        return next_post
+        bot.send_photo(CHANNEL_ID, photo=image_url.strip(), caption=caption)
     except Exception as e:
-        print("Error reading posts:", e)
-        return None
+        print(f"Error sending post: {e}")
 
-while True:
-    post = get_next_post()
-    if post:
-        try:
-            bot.send_message(CHANNEL_ID, post, parse_mode="HTML")
-            print("Post sent!")
-        except Exception as e:
-            print("Error sending post:", e)
-    else:
-        print("No posts to send.")
-    time.sleep(1200)  # כל 20 דקות (20*60 = 1200 שניות)
+def schedule_posts():
+    products = read_products()
+    for i, product in enumerate(products):
+        delay = i * 20 * 60  # every 20 minutes
+        threading.Timer(delay, post_to_channel, args=[product]).start()
+
+@bot.message_handler(content_types=['text'])
+def handle_text(message):
+    if message.chat.id != ADMIN_ID:
+        bot.send_message(message.chat.id, "⛔️ אין לך הרשאות לבצע פעולה זו.")
+        return
+    with open("products.txt", "w", encoding="utf-8") as f:
+        f.write(message.text)
+    bot.send_message(message.chat.id, "✅ הנתונים התקבלו ונשמרו. הפוסטים יתחילו להישלח 🎯")
+    schedule_posts()
+
+print("Starting bot...")
+schedule_posts()
+bot.polling()
