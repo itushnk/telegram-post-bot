@@ -4,7 +4,7 @@ import telebot
 import requests
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")
+CHANNEL_ID = os.getenv("CHANNEL_ID")  # לדוגמה: "@YourChannelName"
 
 bot = telebot.TeleBot(TOKEN)
 
