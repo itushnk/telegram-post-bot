@@ -1,10 +1,11 @@
+
 import os
 import time
 import telebot
 import requests
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")  # לדוגמה: "@YourChannelName"
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -48,8 +49,7 @@ def main():
     while True:
         post_text, image_url = get_next_post()
         if post_text:
-            post_text = post_text.replace('\n', '
-')
+            post_text = post_text.replace('\n', '\n')
             try:
                 if image_url:
                     if download_image(image_url, TEMP_IMAGE):
@@ -70,3 +70,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
