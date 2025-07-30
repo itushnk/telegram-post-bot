@@ -1,35 +1,72 @@
 import os
 import time
 import telebot
+import requests
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")  # דוגמה: "@YourChannelName"
+CHANNEL_ID = os.getenv("CHANNEL_ID")  # לדוגמה: "@YourChannelName"
 
 bot = telebot.TeleBot(TOKEN)
 
+POSTS_FILE = "posts.txt"
+TEMP_IMAGE = "temp_image.jpg"
+
+def download_image(url, filename):
+    try:
+        r = requests.get(url, stream=True, timeout=15)
+        if r.status_code == 200:
+            with open(filename, 'wb') as f:
+                for chunk in r.iter_content(1024):
+                    f.write(chunk)
+            return True
+        else:
+            print(f"Failed to download image. Status code: {r.status_code}")
+            return False
+    except Exception as e:
+        print(f"Error downloading image: {e}")
+        return False
+
 def get_next_post():
     try:
-        with open("posts.txt", "r", encoding="utf-8") as file:
-            posts = file.readlines()
-        if not posts:
-            return None
-        next_post = posts[0].strip()
-        # Remove the first post after sending
-        with open("posts.txt", "w", encoding="utf-8") as file:
-            file.writelines(posts[1:])
-        return next_post
+        with open(POSTS_FILE, "r", encoding="utf-8") as file:
+            lines = file.readlines()
+        if not lines:
+            return None, None
+        line = lines[0].strip()
+        with open(POSTS_FILE, "w", encoding="utf-8") as file:
+            file.writelines(lines[1:])
+        if '|' in line:
+            text, img_url = line.split('|', 1)
+        else:
+            text, img_url = line, None
+        return text.strip(), img_url.strip() if img_url else None
     except Exception as e:
-        print("Error reading posts:", e)
-        return None
+        print(f"Error reading posts: {e}")
+        return None, None
 
-while True:
-    post = get_next_post()
-    if post:
-        try:
-            bot.send_message(CHANNEL_ID, post, parse_mode="HTML")
-            print("Post sent!")
-        except Exception as e:
-            print("Error sending post:", e)
-    else:
-        print("No posts to send.")
-    time.sleep(1200)  # כל 20 דקות (20*60 = 1200 שניות)
+def main():
+    while True:
+        post_text, image_url = get_next_post()
+        if post_text:
+            try:
+                if image_url:
+                    if download_image(image_url, TEMP_IMAGE):
+                        with open(TEMP_IMAGE, 'rb') as photo:
+                            bot.send_photo(CHANNEL_ID, photo, caption=post_text, parse_mode="HTML")
+                        os.remove(TEMP_IMAGE)
+                    else:
+                        print("שליחה ללא תמונה כי ההורדה נכשלה")
+                        bot.send_message(CHANNEL_ID, post_text, parse_mode="HTML")
+                else:
+                    bot.send_message(CHANNEL_ID, post_text, parse_mode="HTML")
+                print("פוסט נשלח בהצלחה!")
+            except Exception as e:
+                print(f"שגיאה בשליחת הפוסט: {e}")
+        else:
+            print("אין פוסטים לשליחה כרגע.")
+            time.sleep(300)  # מחכה 5 דקות לפני בדיקה נוספת אם אין פוסטים
+            continue
+        time.sleep(20*60)  # 20 דקות בין פוסטים
+
+if __name__ == "__main__":
+    main()
