@@ -4,7 +4,7 @@ import telebot
 import requests
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")  # לדוגמה: "@YourChannelName"
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -48,25 +48,25 @@ def main():
     while True:
         post_text, image_url = get_next_post()
         if post_text:
+            post_text = post_text.replace('\n', '
+')
             try:
                 if image_url:
                     if download_image(image_url, TEMP_IMAGE):
                         with open(TEMP_IMAGE, 'rb') as photo:
-                            bot.send_photo(CHANNEL_ID, photo, caption=post_text, parse_mode="HTML")
+                            bot.send_photo(CHANNEL_ID, photo)
                         os.remove(TEMP_IMAGE)
                     else:
                         print("שליחה ללא תמונה כי ההורדה נכשלה")
-                        bot.send_message(CHANNEL_ID, post_text, parse_mode="HTML")
-                else:
-                    bot.send_message(CHANNEL_ID, post_text, parse_mode="HTML")
+                bot.send_message(CHANNEL_ID, post_text, parse_mode="HTML")
                 print("פוסט נשלח בהצלחה!")
             except Exception as e:
                 print(f"שגיאה בשליחת הפוסט: {e}")
         else:
             print("אין פוסטים לשליחה כרגע.")
-            time.sleep(300)  # מחכה 5 דקות לפני בדיקה נוספת אם אין פוסטים
+            time.sleep(300)
             continue
-        time.sleep(20*60)  # 20 דקות בין פוסטים
+        time.sleep(20*60)
 
 if __name__ == "__main__":
     main()
