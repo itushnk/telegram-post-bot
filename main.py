@@ -1,40 +1,15 @@
 import telebot
-import time
-import os
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")
-
+BOT_TOKEN = "8371104768:AAE8GYjVBeF0H4fqOur9tMLe4_D4laCBRsk"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-def read_next_post():
-    if not os.path.exists("posts.txt"):
-        return None
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.reply_to(message, "שלום! הבוט שלך מוכן ומחכה לפקודות 😊")
 
-    with open("posts.txt", "r", encoding="utf-8") as f:
-        posts = f.read().strip().split("
----
-")
+@bot.message_handler(func=lambda message: True)
+def echo_all(message):
+    bot.reply_to(message, f"קיבלת: {message.text}")
 
-    if not posts:
-        return None
-
-    next_post = posts.pop(0).strip()
-
-    with open("posts.txt", "w", encoding="utf-8") as f:
-        f.write("
----
-".join(posts))
-
-    return next_post
-
-def send_next_post():
-    post_text = read_next_post()
-    if post_text:
-        bot.send_message(CHANNEL_ID, post_text, parse_mode="HTML", disable_web_page_preview=False)
-    else:
-        print("אין פוסטים לשליחה כרגע.")
-
-if __name__ == "__main__":
-    time.sleep(5)
-    send_next_post()
+print("הבוט מופעל...")
+bot.infinity_polling()
