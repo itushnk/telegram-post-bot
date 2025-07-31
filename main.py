@@ -1,29 +1,27 @@
-from flask import Flask, request
-import telebot
 import os
+import telebot
+from flask import Flask, request
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    print("❌ שגיאה: טוקן הבוט לא נמצא במשתני סביבה!")
-    exit()
-
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return "הבוט מופעל!"
+# 📥 מסלול webhook – מקבל את כל העדכונים מטלגרם
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return '', 200
+    else:
+        return 'Invalid content type', 403
 
-@app.route('/send', methods=['POST'])
-def send_post():
-    data = request.get_json()
-    if not data or 'chat_id' not in data or 'text' not in data:
-        return "❌ נתונים חסרים", 400
-    try:
-        bot.send_message(data['chat_id'], data['text'], parse_mode='HTML')
-        return "✅ ההודעה נשלחה", 200
-    except Exception as e:
-        return f"שגיאה בשליחה: {str(e)}", 500
+# 💬 הודעה פשוטה – לדוגמה: תגובה ל"שלום"
+@bot.message_handler(func=lambda message: True)
+def echo_all(message):
+    bot.reply_to(message, "היי! אני הבוט שלך – מה נשמע? 🤖")
 
+# 🚀 הרצת האפליקציה ב-Railway
 if __name__ == '__main__':
-    app.run(debug=False, host="0.0.0.0", port=5000)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
