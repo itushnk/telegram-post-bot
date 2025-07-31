@@ -1,3 +1,3 @@
-# Telegram Post Bot
+# Telegram Bot for Product Posting
 
-בוט פשוט לשליחת פוסטים בטלגרם באמצעות Telebot.
+This bot reads from `products.csv` and posts product info to your Telegram channel every 20 minutes.
